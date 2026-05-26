@@ -746,11 +746,11 @@ const canSelectAll = computed(() => {
 });
 
 const contextSessionId = ref<string | null>(null);
-const contextSessionPinned = computed(() =>
-  contextSessionId.value
-    ? sessionBrowserPrefsStore.isPinned(contextSessionId.value)
-    : false,
-);
+const contextSessionPinned = computed(() => {
+  if (!contextSessionId.value) return false;
+  const session = chatStore.sessions.find(s => s.id === contextSessionId.value);
+  return !!(session?.pinned) || sessionBrowserPrefsStore.isPinned(contextSessionId.value);
+});
 const contextSession = computed(() =>
   contextSessionId.value
     ? chatStore.sessions.find((session) => session.id === contextSessionId.value) || null
