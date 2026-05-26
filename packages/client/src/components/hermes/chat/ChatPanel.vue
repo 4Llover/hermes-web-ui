@@ -209,7 +209,7 @@ function sortSessionsForSidebar(items: Session[]): Session[] {
 const pinnedSessions = computed(() =>
   sortSessionsForSidebar(
     chatStore.sessions.filter((session) =>
-      !session.archived && !session.deletedAt &&
+      !session.archived && !session.deletedAt && !session.folderId &&
       (session.pinned || sessionBrowserPrefsStore.isPinned(session.id)),
     ),
   ),
@@ -219,7 +219,7 @@ const unpinnedSessions = computed(() =>
   sortSessionsForSidebar(
     chatStore.sessions.filter(
       (session) => !session.archived && !session.deletedAt &&
-        !session.pinned && !sessionBrowserPrefsStore.isPinned(session.id),
+        (session.folderId || (!session.pinned && !sessionBrowserPrefsStore.isPinned(session.id))),
     ),
   ),
 );
