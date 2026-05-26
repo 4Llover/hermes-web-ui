@@ -106,6 +106,9 @@ export interface Session {
    * Empty string / undefined = use config.yaml default.
    * Values: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' */
   reasoningEffort?: string
+  folderId?: string | null
+  sortOrder?: number
+  pinned?: boolean
 }
 
 interface CompressionState {
@@ -458,6 +461,9 @@ function mapHermesSession(s: SessionSummary): Session {
     endedAt: s.ended_at != null ? Math.round(s.ended_at * 1000) : null,
     lastActiveAt: s.last_active != null ? Math.round(s.last_active * 1000) : undefined,
     workspace: s.workspace || null,
+    folderId: s.folder_id || null,
+    sortOrder: s.sort_order || 0,
+    pinned: !!(s.pinned),
   }
 }
 

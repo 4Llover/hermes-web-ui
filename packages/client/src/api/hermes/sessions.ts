@@ -28,6 +28,9 @@ export interface SessionSummary {
   cost_status: string
   workspace?: string | null
   webui_imported?: boolean
+  folder_id?: string | null
+  sort_order?: number
+  pinned?: number
 }
 
 export interface SessionDetail extends SessionSummary {

@@ -209,7 +209,7 @@ function sortSessionsForSidebar(items: Session[]): Session[] {
 const pinnedSessions = computed(() =>
   sortSessionsForSidebar(
     chatStore.sessions.filter((session) =>
-      sessionBrowserPrefsStore.isPinned(session.id),
+      session.pinned || sessionBrowserPrefsStore.isPinned(session.id),
     ),
   ),
 );
@@ -217,7 +217,7 @@ const pinnedSessions = computed(() =>
 const unpinnedSessions = computed(() =>
   sortSessionsForSidebar(
     chatStore.sessions.filter(
-      (session) => !sessionBrowserPrefsStore.isPinned(session.id),
+      (session) => !session.pinned && !sessionBrowserPrefsStore.isPinned(session.id),
     ),
   ),
 );
@@ -234,6 +234,101 @@ watch(
   },
   { immediate: true },
 );
+
+// ── Folder 分组管理 ── (拖拽 + 新建/删除分组)
+
+import { useFoldersStore } from "@/stores/hermes/folders";
+import { VueDraggable } from "vue-draggable-plus";
+import type { Folder } from "@/api/hermes/folders";
+
+const foldersStore = useFoldersStore();
+const showFolderCreateModal = ref(false);
+const newFolderName = ref("");
+const newFolderColor = ref<string | null>(null);
+const editingFolderId = ref<string | null>(null);
+const editingFolderName = ref("");
+
+// Folder colors palette
+const folderColors = ["#1A9C6E", "#2D7DD2", "#E8734A", "#F0B429", "#9B59B6", "#E91E63", "#607D8B", null];
+
+// Initialize folders on mount
+onMounted(async () => {
+  await foldersStore.fetchFolders();
+});
+
+interface FolderGroup {
+  folder: Folder | null; // null = unfiled
+  sessions: ReturnType<typeof sortSessionsWithActiveFirst>;
+}
+
+const folderGroups = computed<FolderGroup[]>(() => {
+  const groups: FolderGroup[] = [];
+
+  // Create a group for each folder
+  for (const folder of foldersStore.sortedFolders) {
+    const folderSessions = unpinnedSessions.value.filter(
+      (s) => s.folderId === folder.id
+    );
+    groups.push({ folder, sessions: folderSessions });
+  }
+
+  // Unfiled sessions group
+  const unfiled = unpinnedSessions.value.filter(
+    (s) => !s.folderId
+  );
+  if (unfiled.length > 0 || groups.length === 0) {
+    groups.push({ folder: null, sessions: unfiled });
+  }
+
+  return groups;
+});
+
+async function handleCreateFolder() {
+  if (!newFolderName.value.trim()) return;
+  await foldersStore.createFolder(newFolderName.value.trim(), newFolderColor.value);
+  newFolderName.value = "";
+  newFolderColor.value = null;
+  showFolderCreateModal.value = false;
+  await chatStore.loadSessions();
+}
+
+async function handleRenameFolder(id: string) {
+  if (!editingFolderName.value.trim()) return;
+  await foldersStore.renameFolder(id, editingFolderName.value.trim());
+  editingFolderId.value = null;
+  editingFolderName.value = "";
+}
+
+async function handleDeleteFolder(id: string) {
+  await foldersStore.removeFolder(id);
+  await chatStore.loadSessions();
+}
+
+function startRenameFolder(folder: Folder) {
+  editingFolderId.value = folder.id;
+  editingFolderName.value = folder.name;
+}
+
+async function handleSessionDrop(folderId: string | null, evt: any) {
+  // When a session is dropped into a folder
+  if (evt.added || evt.moved) {
+    const item = evt.added?.element || evt.moved?.element;
+    if (item?.id) {
+      await foldersStore.moveSession(item.id, folderId);
+      // Update local session data
+      const session = chatStore.sessions.find((s) => s.id === item.id);
+      if (session) session.folderId = folderId;
+    }
+  }
+}
+
+async function handleTogglePin(sessionId: string) {
+  const result = await foldersStore.togglePin(sessionId);
+  if (result) {
+    const session = chatStore.sessions.find((s) => s.id === sessionId);
+    if (session) session.pinned = result.pinned;
+  }
+}
 
 const activeSessionTitle = computed(
   () => chatStore.activeSession?.title || t("chat.newChat"),
@@ -1101,6 +1196,31 @@ async function handleSessionModelCustomSubmit() {
           </div>
         </div>
       </div>
+      <div v-if="showSessions" class="session-profile-filter">
+        <NSelect
+          :value="sessionProfileFilter || '__all__'"
+          :options="profileFilterOptions"
+          size="small"
+          :loading="profilesStore.loading"
+          @update:value="handleProfileFilterChange"
+        />
+      </div>
+      <div v-if="showSessions && foldersStore.sortedFolders.length > 0" class="session-group-toggle">
+        <NButton size="tiny" quaternary @click="showFolderCreateModal = true">
+          <template #icon>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          </template>
+          {{ t('chat.newFolder') }}
+        </NButton>
+      </div>
+      <div v-else-if="showSessions" class="session-group-toggle">
+        <NButton size="tiny" quaternary @click="showFolderCreateModal = true">
+          <template #icon>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          </template>
+          {{ t('chat.newFolder') }}
+        </NButton>
+      </div>
       <div v-if="showSessions" class="session-items">
         <div
           v-if="chatStore.isLoadingSessions && chatStore.sessions.length === 0"
@@ -1140,27 +1260,81 @@ async function handleSessionModelCustomSubmit() {
           />
         </template>
 
-        <SessionListItem
-          v-for="s in unpinnedSessions"
-          :key="s.id"
-          :session="s"
-          :active="s.id === chatStore.activeSessionId"
-          :pinned="false"
-          :can-delete="
-            s.id !== chatStore.activeSessionId ||
-            chatStore.sessions.length > 1
-          "
-          :streaming="chatStore.isSessionLive(s.id)"
-          :completed-unread="chatStore.isSessionCompletedUnread(s.id)"
-          :selectable="isBatchMode"
-          :selected="isSessionSelected(s)"
-          :show-profile="true"
-          :to="sessionHref(s.id)"
-          @select="handleSessionClick(s.id)"
-          @contextmenu="handleContextMenu($event, s.id)"
-          @delete="handleDeleteSession(s.id)"
-          @toggle-select="toggleSessionSelection(s)"
-        />
+        <!-- 按分组展示 (支持拖拽) -->
+        <template v-for="group in folderGroups" :key="group.folder?.id || '__unfiled__'">
+          <div
+            class="session-group-header"
+            @click="group.folder && foldersStore.toggleCollapsed(group.folder.id)"
+            @dblclick.stop="group.folder && startRenameFolder(group.folder)"
+          >
+            <svg
+              v-if="group.folder"
+              width="10" height="10" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2"
+              class="group-chevron"
+              :class="{ collapsed: group.folder && foldersStore.isCollapsed(group.folder.id) }"
+            ><polyline points="9 18 15 12 9 6"/></svg>
+            <span
+              v-if="group.folder && editingFolderId === group.folder.id"
+              class="session-group-label"
+            >
+              <input
+                v-model="editingFolderName"
+                class="folder-rename-input"
+                @keyup.enter="handleRenameFolder(group.folder!.id)"
+                @keyup.escape="editingFolderId = null"
+                @blur="handleRenameFolder(group.folder!.id)"
+                autofocus
+              />
+            </span>
+            <span v-else class="session-group-label">
+              <span
+                v-if="group.folder?.color"
+                class="folder-color-dot"
+                :style="{ backgroundColor: group.folder.color }"
+              ></span>
+              {{ group.folder?.name || t('chat.unfiled') }}
+            </span>
+            <span class="session-group-count">{{ group.sessions.length }}</span>
+            <button
+              v-if="group.folder"
+              class="folder-delete-btn"
+              :title="t('common.delete')"
+              @click.stop="handleDeleteFolder(group.folder.id)"
+            >×</button>
+          </div>
+          <VueDraggable
+            v-if="!group.folder || !foldersStore.isCollapsed(group.folder.id)"
+            v-model="group.sessions"
+            group="sessions"
+            :animation="200"
+            ghost-class="drag-ghost"
+            class="folder-drop-zone"
+            @change="(evt: any) => handleSessionDrop(group.folder?.id || null, evt)"
+          >
+            <SessionListItem
+              v-for="s in group.sessions"
+              :key="`folder-${s.id}`"
+              :session="s"
+              :active="s.id === chatStore.activeSessionId"
+              :pinned="!!s.pinned"
+              :can-delete="
+                s.id !== chatStore.activeSessionId ||
+                chatStore.sessions.length > 1
+              "
+              :streaming="chatStore.isSessionLive(s.id)"
+              :completed-unread="chatStore.isSessionCompletedUnread(s.id)"
+              :selectable="isBatchMode"
+              :selected="isSessionSelected(s)"
+              :show-profile="true"
+              :to="sessionHref(s.id)"
+              @select="handleSessionClick(s.id)"
+              @contextmenu="handleContextMenu($event, s.id)"
+              @delete="handleDeleteSession(s.id)"
+              @toggle-select="toggleSessionSelection(s)"
+            />
+          </VueDraggable>
+        </template>
       </div>
       <div v-if="showSessions" class="page-sidebar-bottom">
         <NPopover
@@ -1548,6 +1722,33 @@ async function handleSessionModelCustomSubmit() {
         </template>
       </NDrawerContent>
     </NDrawer>
+
+    <!-- Create Folder Modal -->
+    <NModal v-model:show="showFolderCreateModal" preset="card" :title="t('chat.createFolder')" size="small" style="max-width: 360px">
+      <div class="folder-create-form">
+        <NInput
+          v-model:value="newFolderName"
+          :placeholder="t('chat.folderNamePlaceholder')"
+          autofocus
+          @keyup.enter="handleCreateFolder"
+        />
+        <div class="folder-color-picker">
+          <span
+            v-for="c in folderColors"
+            :key="c || 'none'"
+            class="color-swatch"
+            :class="{ active: newFolderColor === c }"
+            :style="{ backgroundColor: c || '#888' }"
+            @click="newFolderColor = c"
+          >
+            <span v-if="!c">∅</span>
+          </span>
+        </div>
+        <NButton type="primary" size="small" block @click="handleCreateFolder" :disabled="!newFolderName.trim()">
+          {{ t('chat.createFolder') }}
+        </NButton>
+      </div>
+    </NModal>
 
     <div class="chat-main">
       <header class="chat-header">
@@ -2155,6 +2356,10 @@ async function handleSessionModelCustomSubmit() {
   }
 }
 
+.session-group-toggle {
+  margin: 0 8px 6px;
+}
+
 .new-chat-form {
   display: flex;
   flex-direction: column;
@@ -2259,6 +2464,97 @@ async function handleSessionModelCustomSubmit() {
   font-size: 10px;
   color: $text-muted;
   font-weight: 400;
+}
+
+.folder-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+.folder-delete-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: $text-muted;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+
+  .session-group-header:hover & {
+    opacity: 0.7;
+  }
+
+  &:hover {
+    opacity: 1 !important;
+    color: #e53e3e;
+  }
+}
+
+.folder-rename-input {
+  font-size: 10px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--primary-color, #1a9c6e);
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: inherit;
+  width: 100%;
+  outline: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.folder-drop-zone {
+  min-height: 4px;
+  transition: background-color 0.2s;
+}
+
+.drag-ghost {
+  opacity: 0.4;
+  background: var(--primary-color, #1a9c6e);
+  border-radius: 6px;
+}
+
+.folder-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.folder-color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: white;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, transform 0.15s;
+
+  &.active {
+    border-color: white;
+    transform: scale(1.2);
+    box-shadow: 0 0 0 2px var(--primary-color, #1a9c6e);
+  }
+
+  &:hover {
+    transform: scale(1.1);
+  }
 }
 
 .session-items {

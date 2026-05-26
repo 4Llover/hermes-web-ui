@@ -36,6 +36,9 @@ export interface HermesSessionRow {
   preview: string
   last_active: number
   workspace: string | null
+  folder_id: string | null
+  sort_order: number
+  pinned: number
 }
 
 export interface HermesMessageRow {
@@ -114,6 +117,9 @@ function mapSessionRow(row: Record<string, unknown>): HermesSessionRow {
     preview: String(row.preview || ''),
     last_active: Number(row.last_active || 0),
     workspace: row.workspace != null ? String(row.workspace) : null,
+    folder_id: row.folder_id != null ? String(row.folder_id) : null,
+    sort_order: Number(row.sort_order || 0),
+    pinned: Number(row.pinned || 0),
   }
 }
 
@@ -164,6 +170,7 @@ export function createSession(data: {
       input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0,
       billing_provider: null, estimated_cost_usd: 0, actual_cost_usd: null,
       cost_status: '', preview: '', last_active: now, workspace: data.workspace || null,
+      folder_id: null, sort_order: 0, pinned: 0,
     }
   }
   const db = getDb()!

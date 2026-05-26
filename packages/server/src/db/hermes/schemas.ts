@@ -57,6 +57,9 @@ export const SESSIONS_SCHEMA: Record<string, string> = {
   preview: 'TEXT NOT NULL DEFAULT \'\'',
   last_active: 'INTEGER NOT NULL',
   workspace: 'TEXT',
+  folder_id: 'TEXT',
+  sort_order: 'INTEGER DEFAULT 0',
+  pinned: 'INTEGER DEFAULT 0',
 }
 
 export const MESSAGES_TABLE = 'messages'
@@ -315,6 +318,23 @@ export const GC_SESSION_PROFILES_SCHEMA: Record<string, string> = {
 }
 
 // ============================================================================
+// Folders (Session Groups)
+// ============================================================================
+
+export const FOLDERS_TABLE = 'folders'
+
+export const FOLDERS_SCHEMA: Record<string, string> = {
+  id: 'TEXT PRIMARY KEY',
+  name: 'TEXT NOT NULL',
+  color: 'TEXT',
+  sort_order: 'INTEGER DEFAULT 0',
+  created_at: 'INTEGER NOT NULL',
+  updated_at: 'INTEGER NOT NULL',
+}
+
+export const FOLDERS_INDEX = 'CREATE INDEX IF NOT EXISTS idx_folders_sort ON folders(sort_order)'
+
+// ============================================================================
 // Schema Sync Utilities
 // ============================================================================
 
@@ -479,6 +499,11 @@ export function initAllHermesTables(): void {
     syncTable(SESSIONS_TABLE, SESSIONS_SCHEMA)
     syncTable(MESSAGES_TABLE, MESSAGES_SCHEMA)
     db.exec(MESSAGES_INDEX)
+
+    // Folders (session groups)
+    syncTable(FOLDERS_TABLE, FOLDERS_SCHEMA, {
+      indexes: { idx_folders_sort: FOLDERS_INDEX }
+    })
 
     // Compression snapshot
     syncTable(COMPRESSION_SNAPSHOT_TABLE, COMPRESSION_SNAPSHOT_SCHEMA)
