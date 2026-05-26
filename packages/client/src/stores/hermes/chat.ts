@@ -109,6 +109,8 @@ export interface Session {
   folderId?: string | null
   sortOrder?: number
   pinned?: boolean
+  archived?: boolean
+  deletedAt?: number | null
 }
 
 interface CompressionState {
@@ -464,6 +466,8 @@ function mapHermesSession(s: SessionSummary): Session {
     folderId: s.folder_id || null,
     sortOrder: s.sort_order || 0,
     pinned: !!(s.pinned),
+    archived: !!(s.archived),
+    deletedAt: s.deleted_at || null,
   }
 }
 

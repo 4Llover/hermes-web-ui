@@ -60,6 +60,8 @@ export const SESSIONS_SCHEMA: Record<string, string> = {
   folder_id: 'TEXT',
   sort_order: 'INTEGER DEFAULT 0',
   pinned: 'INTEGER DEFAULT 0',
+  archived: 'INTEGER DEFAULT 0',
+  deleted_at: 'INTEGER',
 }
 
 export const MESSAGES_TABLE = 'messages'
@@ -335,6 +337,29 @@ export const FOLDERS_SCHEMA: Record<string, string> = {
 export const FOLDERS_INDEX = 'CREATE INDEX IF NOT EXISTS idx_folders_sort ON folders(sort_order)'
 
 // ============================================================================
+// Tags (Session Labels)
+// ============================================================================
+
+export const TAGS_TABLE = 'tags'
+
+export const TAGS_SCHEMA: Record<string, string> = {
+  id: 'TEXT PRIMARY KEY',
+  name: 'TEXT NOT NULL',
+  color: 'TEXT',
+  created_at: 'INTEGER NOT NULL',
+}
+
+export const SESSION_TAGS_TABLE = 'session_tags'
+
+export const SESSION_TAGS_SCHEMA: Record<string, string> = {
+  session_id: 'TEXT NOT NULL',
+  tag_id: 'TEXT NOT NULL',
+}
+
+export const SESSION_TAGS_INDEX = 'CREATE UNIQUE INDEX IF NOT EXISTS idx_session_tags_unique ON session_tags(session_id, tag_id)'
+export const SESSION_TAGS_TAG_INDEX = 'CREATE INDEX IF NOT EXISTS idx_session_tags_tag ON session_tags(tag_id)'
+
+// ============================================================================
 // Schema Sync Utilities
 // ============================================================================
 
@@ -503,6 +528,16 @@ export function initAllHermesTables(): void {
     // Folders (session groups)
     syncTable(FOLDERS_TABLE, FOLDERS_SCHEMA, {
       indexes: { idx_folders_sort: FOLDERS_INDEX }
+    })
+
+    // Tags (session labels)
+    syncTable(TAGS_TABLE, TAGS_SCHEMA)
+    syncTable(SESSION_TAGS_TABLE, SESSION_TAGS_SCHEMA, {
+      primaryKey: 'session_id, tag_id',
+      indexes: {
+        idx_session_tags_unique: SESSION_TAGS_INDEX,
+        idx_session_tags_tag: SESSION_TAGS_TAG_INDEX,
+      }
     })
 
     // Compression snapshot

@@ -31,6 +31,8 @@ export interface SessionSummary {
   folder_id?: string | null
   sort_order?: number
   pinned?: number
+  archived?: number
+  deleted_at?: number | null
 }
 
 export interface SessionDetail extends SessionSummary {

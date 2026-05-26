@@ -209,7 +209,8 @@ function sortSessionsForSidebar(items: Session[]): Session[] {
 const pinnedSessions = computed(() =>
   sortSessionsForSidebar(
     chatStore.sessions.filter((session) =>
-      session.pinned || sessionBrowserPrefsStore.isPinned(session.id),
+      !session.archived && !session.deletedAt &&
+      (session.pinned || sessionBrowserPrefsStore.isPinned(session.id)),
     ),
   ),
 );
@@ -217,7 +218,8 @@ const pinnedSessions = computed(() =>
 const unpinnedSessions = computed(() =>
   sortSessionsForSidebar(
     chatStore.sessions.filter(
-      (session) => !session.pinned && !sessionBrowserPrefsStore.isPinned(session.id),
+      (session) => !session.archived && !session.deletedAt &&
+        !session.pinned && !sessionBrowserPrefsStore.isPinned(session.id),
     ),
   ),
 );
@@ -760,8 +762,19 @@ const contextMenuOptions = computed(() => {
     label: t(contextSessionPinned.value ? "chat.unpin" : "chat.pin"),
     key: "pin",
   },
-  { label: t("chat.rename"), key: "rename" },
-  { label: t("chat.setWorkspace"), key: "workspace" }]
+  { label: t("chat.rename"), key: "rename" }]
+
+  // "移至分组" submenu
+  const folderChildren: DropdownOption[] = foldersStore.sortedFolders.map(f => ({
+    label: f.name,
+    key: `move-to-folder-${f.id}`,
+  }));
+  folderChildren.push({ label: t("chat.unfiled"), key: "move-to-folder-none" });
+  options.push({
+    label: t("chat.moveToFolder"),
+    key: "move-to-folder",
+    children: folderChildren,
+  })
 
   if (contextSession.value?.source === "cli") {
     options.push({ label: t("chat.setModel"), key: "model" })
@@ -792,6 +805,9 @@ const contextMenuOptions = computed(() => {
   options.push({ label: t("chat.openSessionInNewTab"), key: "open-link" })
   options.push({ label: t("chat.copySessionLink"), key: "copy-link" })
   options.push({ label: t("chat.copySessionId"), key: "copy-id" })
+  options.push({ type: 'divider', key: 'd1' } as any)
+  options.push({ label: t("chat.archiveSession"), key: "archive" })
+  options.push({ label: t("chat.trashSession"), key: "trash" })
   return options
 });
 
@@ -850,6 +866,14 @@ async function handleContextMenuSelect(key: string) {
   if (!contextSessionId.value) return;
   if (key === "pin") {
     sessionBrowserPrefsStore.togglePinned(contextSessionId.value);
+    await handleTogglePin(contextSessionId.value);
+    return;
+  }
+  if (key.startsWith("move-to-folder-")) {
+    const folderId = key === "move-to-folder-none" ? null : key.replace("move-to-folder-", "");
+    await foldersStore.moveSession(contextSessionId.value, folderId);
+    const session = chatStore.sessions.find(s => s.id === contextSessionId.value);
+    if (session) session.folderId = folderId;
     return;
   }
   if (key === "copy-link") {
@@ -869,15 +893,16 @@ async function handleContextMenuSelect(key: string) {
       loadingMsg?.destroy();
       message.error(t("chat.exportFailed"));
     }
-  } else if (key === "workspace") {
-    const session = chatStore.sessions.find(
-      (s) => s.id === contextSessionId.value,
-    );
-    workspaceSessionId.value = contextSessionId.value;
-    workspaceValue.value = session?.workspace || "";
-    showWorkspaceModal.value = true;
   } else if (key === "model") {
     await openSessionModelModal(contextSessionId.value);
+  } else if (key === "archive") {
+    await fetch(`/api/hermes/sessions/${contextSessionId.value}/archive`, { method: 'POST' });
+    const session = chatStore.sessions.find(s => s.id === contextSessionId.value);
+    if (session) session.archived = true;
+  } else if (key === "trash") {
+    await fetch(`/api/hermes/sessions/${contextSessionId.value}/trash`, { method: 'POST' });
+    const session = chatStore.sessions.find(s => s.id === contextSessionId.value);
+    if (session) session.deletedAt = Date.now();
   } else if (key === "rename") {
     const session = chatStore.sessions.find(
       (s) => s.id === contextSessionId.value,

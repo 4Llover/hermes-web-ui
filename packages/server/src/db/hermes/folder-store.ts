@@ -201,6 +201,59 @@ export function migrateWorkspaceToFolders(): { migrated: number; foldersCreated:
   return { migrated, foldersCreated }
 }
 
+// --- Archive & Recycle Bin ---
+
+export function archiveSession(sessionId: string): boolean {
+  const db = getDb()
+  if (!db) return false
+  const result = db.prepare(`UPDATE ${SESSIONS_TABLE} SET archived = 1 WHERE id = ?`).run(sessionId)
+  return (result as any).changes > 0
+}
+
+export function unarchiveSession(sessionId: string): boolean {
+  const db = getDb()
+  if (!db) return false
+  const result = db.prepare(`UPDATE ${SESSIONS_TABLE} SET archived = 0 WHERE id = ?`).run(sessionId)
+  return (result as any).changes > 0
+}
+
+export function softDeleteSession(sessionId: string): boolean {
+  const db = getDb()
+  if (!db) return false
+  const now = Math.floor(Date.now() / 1000)
+  const result = db.prepare(`UPDATE ${SESSIONS_TABLE} SET deleted_at = ? WHERE id = ?`).run(now, sessionId)
+  return (result as any).changes > 0
+}
+
+export function restoreSession(sessionId: string): boolean {
+  const db = getDb()
+  if (!db) return false
+  const result = db.prepare(`UPDATE ${SESSIONS_TABLE} SET deleted_at = NULL WHERE id = ?`).run(sessionId)
+  return (result as any).changes > 0
+}
+
+export function listDeletedSessions(): Array<{ id: string; title: string | null; deleted_at: number }> {
+  const db = getDb()
+  if (!db) return []
+  return db.prepare(
+    `SELECT id, title, deleted_at FROM ${SESSIONS_TABLE} WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC`
+  ).all() as any[]
+}
+
+export function purgeDeletedSessions(olderThanDays = 30): number {
+  const db = getDb()
+  if (!db) return 0
+  const cutoff = Math.floor(Date.now() / 1000) - (olderThanDays * 86400)
+  // Delete associated messages first
+  db.prepare(
+    `DELETE FROM messages WHERE session_id IN (SELECT id FROM ${SESSIONS_TABLE} WHERE deleted_at IS NOT NULL AND deleted_at < ?)`
+  ).run(cutoff)
+  const result = db.prepare(
+    `DELETE FROM ${SESSIONS_TABLE} WHERE deleted_at IS NOT NULL AND deleted_at < ?`
+  ).run(cutoff)
+  return (result as any).changes
+}
+
 // --- Helpers ---
 
 function mapFolderRow(row: any): FolderWithCount {
