@@ -42,6 +42,7 @@ import ThemeSwitch from "@/components/layout/ThemeSwitch.vue";
 import VersionManagementModal from "@/components/layout/VersionManagementModal.vue";
 import { changelog } from "@/data/changelog";
 import { getStoredUsername } from "@/api/client";
+import SessionRelationsPanel from "./SessionRelationsPanel.vue";
 
 const chatStore = useChatStore();
 const appStore = useAppStore();
@@ -61,6 +62,7 @@ const showToolPanel = ref(false);
 const activeToolPanel = ref<"files" | "terminal">("files");
 const toolPanelWidth = ref(560);
 const toolResizeStart = ref<{ x: number; width: number } | null>(null);
+const showRelations = ref(false);
 
 const currentMode = ref<"chat" | "live">("chat");
 
@@ -1874,6 +1876,34 @@ async function handleSessionModelCustomSubmit() {
                 <NButton
                   quaternary
                   size="small"
+                  :type="showRelations ? 'primary' : 'default'"
+                  @click="showRelations = !showRelations"
+                  circle
+                >
+                  <template #icon>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </template>
+                </NButton>
+              </template>
+              {{ t("sessionRelations.title") || "关联会话" }}
+            </NTooltip>
+            <NTooltip trigger="hover">
+              <template #trigger>
+                <NButton
+                  quaternary
+                  size="small"
                   @click="copySessionId()"
                   circle
                 >
@@ -1980,6 +2010,120 @@ async function handleSessionModelCustomSubmit() {
                 <TerminalPanel
                   v-show="activeToolPanel === 'terminal'"
                   :visible="showToolPanel && activeToolPanel === 'terminal'"
+                />
+              </div>
+            </div>
+          </aside>
+          <SessionRelationsPanel v-if="showRelations && chatStore.activeSessionId" :session-id="chatStore.activeSessionId" />
+        </div>
+        <div v-if="visibleApproval" class="approval-bar">
+          <div class="approval-icon" aria-hidden="true">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+          </div>
+          <div class="approval-content">
+            <div class="approval-main">
+              <div class="approval-kicker">{{ t("chat.approvalKicker") }}</div>
+              <div class="approval-title">{{ t("chat.approvalTitle") }}</div>
+              <div class="approval-desc">{{ visibleApproval.description }}</div>
+              <code class="approval-command">{{ visibleApproval.command }}</code>
+            </div>
+            <div class="approval-actions">
+              <NButton
+                v-if="visibleApproval.choices.includes('once')"
+                size="small"
+                type="primary"
+                @click="handleApproval('once')"
+              >
+                {{ t("chat.approvalAllowOnce") }}
+              </NButton>
+              <NButton
+                v-if="visibleApproval.choices.includes('session')"
+                size="small"
+                secondary
+                @click="handleApproval('session')"
+              >
+                {{ t("chat.approvalAllowSession") }}
+              </NButton>
+              <NButton
+                v-if="visibleApproval.choices.includes('always')"
+                size="small"
+                secondary
+                @click="handleApproval('always')"
+              >
+                {{ t("chat.approvalAlways") }}
+              </NButton>
+              <NButton
+                v-if="visibleApproval.choices.includes('deny')"
+                size="small"
+                type="error"
+                secondary
+                @click="handleApproval('deny')"
+              >
+                {{ t("chat.approvalDeny") }}
+              </NButton>
+            </div>
+          </div>
+        </div>
+        <div v-if="visibleClarify" class="clarify-bar">
+          <div class="clarify-icon" aria-hidden="true">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+          <div class="clarify-content">
+            <div class="clarify-main">
+              <div class="clarify-kicker">{{ t('chat.clarifyKicker') }}</div>
+              <div class="clarify-title">{{ t('chat.clarifyTitle') }}</div>
+              <div class="clarify-desc">{{ visibleClarify.question }}</div>
+            </div>
+            <div v-if="visibleClarify.choices && visibleClarify.choices.length" class="clarify-actions">
+              <NButton
+                v-for="choice in visibleClarify.choices"
+                :key="choice"
+                size="small"
+                type="primary"
+                @click="handleClarify(choice)"
+              >
+                {{ choice }}
+              </NButton>
+              <NButton
+                size="small"
+                type="error"
+                secondary
+                @click="handleClarify('')"
+              >
+                {{ t('chat.clarifyDismiss') }}
+              </NButton>
+            </div>
+            <div v-else class="clarify-actions clarify-actions-open">
+              <div class="clarify-input-row">
+                <NInput
+                  v-model:value="clarifyResponse"
+                  size="small"
+                  :placeholder="t('chat.clarifyPlaceholder')"
                 />
               </div>
             </div>
@@ -2457,10 +2601,12 @@ async function handleSessionModelCustomSubmit() {
 .session-group-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 10px 4px;
+  gap: 6px;
+  padding: 8px 10px 6px;
   cursor: pointer;
   user-select: none;
+  border-bottom: 1px solid rgba(var(--border-color-rgb, 200, 200, 200), 0.15);
+  margin-bottom: 2px;
 }
 
 .session-group-header--static {
@@ -2478,25 +2624,29 @@ async function handleSessionModelCustomSubmit() {
 }
 
 .session-group-label {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
-  color: $text-muted;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: $text-secondary;
+  letter-spacing: 0.2px;
 }
 
 .session-group-count {
-  font-size: 10px;
+  font-size: 11px;
   color: $text-muted;
   font-weight: 400;
+  background: rgba(var(--accent-primary-rgb, 26, 156, 110), 0.08);
+  padding: 0 6px;
+  border-radius: 8px;
+  line-height: 18px;
 }
 
 .folder-color-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   margin-right: 4px;
+  flex-shrink: 0;
 }
 
 .folder-delete-btn {
@@ -2522,7 +2672,7 @@ async function handleSessionModelCustomSubmit() {
 }
 
 .folder-rename-input {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   background: transparent;
   border: 1px solid var(--primary-color, #1a9c6e);
@@ -2531,8 +2681,7 @@ async function handleSessionModelCustomSubmit() {
   color: inherit;
   width: 100%;
   outline: none;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
 }
 
 .folder-drop-zone {
@@ -2872,6 +3021,155 @@ async function handleSessionModelCustomSubmit() {
   color: $text-muted;
   text-align: center;
 }
+
+
+:deep(.session-item) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  color: $text-secondary;
+  transition: all $transition-fast;
+  margin-bottom: 2px;
+
+  &:hover {
+    background: rgba($accent-primary, 0.06);
+    color: $text-primary;
+
+    .session-item-delete {
+      opacity: 1;
+    }
+  }
+
+  &.active {
+    background: rgba(var(--accent-primary-rgb), 0.12);
+    color: $text-primary;
+    font-weight: 500;
+  }
+
+  &.active .session-item-title {
+    color: $accent-primary;
+  }
+
+  &.missing-models {
+    color: #b42318;
+    background: rgba(220, 38, 38, 0.08);
+
+    .session-item-title,
+    .session-item-profile-name,
+    .session-item-time {
+      color: #b42318;
+    }
+
+    .session-item-model {
+      color: #b42318;
+      background: rgba(220, 38, 38, 0.12);
+    }
+
+    &:hover {
+      background: rgba(220, 38, 38, 0.12);
+    }
+  }
+}
+
+:deep(.session-item-content) {
+  flex: 1;
+  overflow: hidden;
+}
+
+:deep(.session-item-title-row) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+:deep(.session-item-title) {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:deep(.session-item-streaming) {
+  display: inline-block;
+  flex-shrink: 0;
+  margin-right: 4px;
+  vertical-align: middle;
+  animation: spin 1.2s linear infinite;
+  color: $accent-primary;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+:deep(.session-item-pin) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: $accent-primary;
+}
+
+:deep(.session-item-time) {
+  font-size: 11px;
+  color: $text-muted;
+}
+
+:deep(.session-item-meta) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+:deep(.session-item-model) {
+  font-size: 10px;
+  color: $accent-primary;
+  background: rgba($accent-primary, 0.08);
+  padding: 0 5px;
+  border-radius: 3px;
+  line-height: 16px;
+  flex-shrink: 0;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.session-item-delete) {
+  flex-shrink: 0;
+  opacity: 0.5;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: $text-muted;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all $transition-fast;
+
+  &:hover {
+    color: $error;
+    background: rgba($error, 0.1);
+  }
+}
+
 
 .chat-main {
   flex: 1;

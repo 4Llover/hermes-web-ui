@@ -401,6 +401,7 @@ export default {
   // 对话
   chat: {
     contextRemaining: '剩余',
+    sessionTokens: 'tokens',
     contextClickToEdit: '点击编辑上下文长度',
     contextEditTitle: '编辑上下文长度',
     contextEditDesc: '设置当前模型的上下文长度限制（token 数量）',
@@ -419,6 +420,18 @@ export default {
     outlineTitle: '会话大纲',
     outlineEmpty: '暂无会话内容',
     outlineUserQuestion: '用户问题',
+    relationsTitle: '关联会话',
+    relationsEmpty: '暂无关联会话',
+    relationsSelectSession: '选择会话...',
+    relationsNotePlaceholder: '备注（可选）...',
+    relationsCreate: '创建关联',
+    relationsDelete: '删除此关联？',
+    relationsChain: '任务链',
+    relationsOutgoing: '从此会话出发',
+    relationsIncoming: '指向此会话',
+    relationsTypeContinuation: '续接',
+    relationsTypeRelated: '关联',
+    relationsTypeFork: '分叉',
     inputPlaceholder: '输入消息... (Enter 发送，Shift+Enter 换行)',
     slashCommandArgs: {
       message: '<消息>',

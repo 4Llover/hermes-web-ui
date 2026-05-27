@@ -401,6 +401,7 @@ export default {
   // Chat
   chat: {
     contextRemaining: 'remaining',
+    sessionTokens: 'tokens',
     contextClickToEdit: 'Click to edit context length',
     contextEditTitle: 'Edit Context Length',
     contextEditDesc: 'Set context length limit for current model (in tokens)',
@@ -419,6 +420,18 @@ export default {
     outlineTitle: 'Conversation Outline',
     outlineEmpty: 'No conversation content',
     outlineUserQuestion: 'User question',
+    relationsTitle: 'Related Sessions',
+    relationsEmpty: 'No related sessions',
+    relationsSelectSession: 'Select a session...',
+    relationsNotePlaceholder: 'Note (optional)...',
+    relationsCreate: 'Create Relation',
+    relationsDelete: 'Delete this relation?',
+    relationsChain: 'Task Chain',
+    relationsOutgoing: 'Outgoing from this session',
+    relationsIncoming: 'Incoming to this session',
+    relationsTypeContinuation: 'Continuation',
+    relationsTypeRelated: 'Related',
+    relationsTypeFork: 'Fork',
     inputPlaceholder: 'Type a message... (Enter to send, Shift+Enter for new line)',
     slashCommandArgs: {
       message: '<message>',

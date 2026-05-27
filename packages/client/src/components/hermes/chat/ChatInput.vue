@@ -460,6 +460,24 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
+const sessionTotalTokens = computed(() => {
+  const input = chatStore.activeSession?.inputTokens ?? 0
+  const output = chatStore.activeSession?.outputTokens ?? 0
+  return input + output
+})
+
+const sessionCost = computed(() => {
+  // prefer estimated, fallback to actual
+  const cost = chatStore.activeSession?.estimatedCost ?? chatStore.activeSession?.actualCost
+  if (cost == null || cost === 0) return null
+  return cost
+})
+
+function formatCost(n: number): string {
+  if (n < 0.01) return '<$0.01'
+  return '$' + n.toFixed(2)
+}
+
 // --- File attachment helpers ---
 
 function addFile(file: File) {
@@ -826,6 +844,12 @@ function isImage(type: string): boolean {
           <span>{{ t('chat.contextClickToEdit') }}</span>
         </NTooltip>
         · {{ t('chat.contextRemaining') }} {{ formatTokens(remainingTokens) }}
+        <template v-if="sessionTotalTokens > 0">
+          · {{ formatTokens(sessionTotalTokens) }} {{ t('chat.sessionTokens') }}
+          <template v-if="sessionCost !== null">
+            · {{ formatCost(sessionCost) }}
+          </template>
+        </template>
       </span>
       <div v-if="showContextUsage" class="context-bar">
         <div

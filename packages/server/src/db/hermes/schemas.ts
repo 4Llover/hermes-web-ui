@@ -360,6 +360,25 @@ export const SESSION_TAGS_INDEX = 'CREATE UNIQUE INDEX IF NOT EXISTS idx_session
 export const SESSION_TAGS_TAG_INDEX = 'CREATE INDEX IF NOT EXISTS idx_session_tags_tag ON session_tags(tag_id)'
 
 // ============================================================================
+// Session Relations (关联会话 - 续接关系)
+// ============================================================================
+
+export const SESSION_RELATIONS_TABLE = 'session_relations'
+
+export const SESSION_RELATIONS_SCHEMA: Record<string, string> = {
+  id: 'TEXT PRIMARY KEY',
+  from_session_id: 'TEXT NOT NULL',
+  to_session_id: 'TEXT NOT NULL',
+  relation_type: "TEXT NOT NULL DEFAULT 'continuation'",  // continuation | related | fork
+  note: 'TEXT',  // 用户备注，如"继续上一个会话的数据处理"
+  created_at: 'INTEGER NOT NULL',
+}
+
+export const SESSION_RELATIONS_FROM_INDEX = 'CREATE INDEX IF NOT EXISTS idx_session_relations_from ON session_relations(from_session_id)'
+export const SESSION_RELATIONS_TO_INDEX = 'CREATE INDEX IF NOT EXISTS idx_session_relations_to ON session_relations(to_session_id)'
+export const SESSION_RELATIONS_UNIQUE_INDEX = 'CREATE UNIQUE INDEX IF NOT EXISTS idx_session_relations_unique ON session_relations(from_session_id, to_session_id)'
+
+// ============================================================================
 // Schema Sync Utilities
 // ============================================================================
 
@@ -537,6 +556,15 @@ export function initAllHermesTables(): void {
       indexes: {
         idx_session_tags_unique: SESSION_TAGS_INDEX,
         idx_session_tags_tag: SESSION_TAGS_TAG_INDEX,
+      }
+    })
+
+    // Session Relations (关联会话)
+    syncTable(SESSION_RELATIONS_TABLE, SESSION_RELATIONS_SCHEMA, {
+      indexes: {
+        idx_session_relations_from: SESSION_RELATIONS_FROM_INDEX,
+        idx_session_relations_to: SESSION_RELATIONS_TO_INDEX,
+        idx_session_relations_unique: SESSION_RELATIONS_UNIQUE_INDEX,
       }
     })
 

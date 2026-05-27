@@ -98,6 +98,8 @@ export interface Session {
   isLoadingOlderMessages?: boolean
   inputTokens?: number
   outputTokens?: number
+  estimatedCost?: number
+  actualCost?: number
   contextTokens?: number
   endedAt?: number | null
   lastActiveAt?: number
@@ -460,6 +462,8 @@ function mapHermesSession(s: SessionSummary): Session {
     hasMoreBefore: false,
     inputTokens: s.input_tokens,
     outputTokens: s.output_tokens,
+    estimatedCost: s.estimated_cost_usd,
+    actualCost: s.actual_cost_usd ?? undefined,
     endedAt: s.ended_at != null ? Math.round(s.ended_at * 1000) : null,
     lastActiveAt: s.last_active != null ? Math.round(s.last_active * 1000) : undefined,
     workspace: s.workspace || null,
