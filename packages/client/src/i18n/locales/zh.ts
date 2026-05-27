@@ -623,6 +623,19 @@ export default {
     speechNotSupported: '此浏览器不支持语音播放',
   },
 
+  // 文件浏览器
+  fileBrowser: {
+    title: '引用文件',
+    search: '输入文件名搜索...',
+    empty: '此目录为空',
+    selected: '已选 {count} 项',
+    hint: '单击文件选中，双击直接确认',
+    confirm: '确认引用',
+    referenceFiles: '引用服务器文件',
+    referenceTooltip: '引用服务器文件/目录',
+    clearAll: '清除全部引用',
+  },
+
   // 看板
   kanban: {
     title: '看板',

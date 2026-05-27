@@ -17,6 +17,8 @@ import { transcribeSpeech } from '@/api/hermes/stt'
 import type { StoredSttProvider } from '@/api/hermes/stt-settings'
 import { useSttSettings } from '@/composables/useSttSettings'
 import { useBrowserSpeechRecognition } from '@/composables/useBrowserSpeechRecognition'
+import type { FileEntry } from '@/api/hermes/files'
+import FileBrowserModal from './FileBrowserModal.vue'
 
 const chatStore = useChatStore()
 const appStore = useAppStore()
@@ -165,6 +167,62 @@ const voiceDialogueError = computed(() =>
   ?? null,
 )
 
+// --- File references (@ trigger) ---
+interface FileRef {
+  path: string
+  name: string
+  isDir: boolean
+}
+const fileRefs = ref<FileRef[]>([])
+const showFileBrowser = ref(false)
+
+function handleFileBrowserSelect(entries: FileEntry[]) {
+  for (const entry of entries) {
+    const path = entry.absolutePath || entry.path
+    if (!fileRefs.value.find(r => r.path === path)) {
+      fileRefs.value.push({
+        path,
+        name: entry.name,
+        isDir: entry.isDir,
+      })
+    }
+  }
+}
+
+function removeFileRef(path: string) {
+  fileRefs.value = fileRefs.value.filter(r => r.path !== path)
+}
+
+function clearFileRefs() {
+  fileRefs.value = []
+}
+
+// Detect @ trigger in textarea
+function detectAtTrigger() {
+  const el = textareaRef.value
+  if (!el) return
+  const cursorPos = el.selectionStart
+  const text = inputText.value
+  // Check if the character right before cursor is @, or @ is being typed
+  const beforeCursor = text.slice(0, cursorPos)
+  const atIdx = beforeCursor.lastIndexOf('@')
+  if (atIdx >= 0) {
+    // Make sure there's no space between @ and cursor
+    const afterAt = beforeCursor.slice(atIdx + 1)
+    if (!afterAt.includes(' ') && !afterAt.includes('\n')) {
+      // Open file browser
+      showFileBrowser.value = true
+      // Remove the @ from input
+      inputText.value = text.slice(0, atIdx) + text.slice(cursorPos)
+      nextTick(() => {
+        if (textareaRef.value) {
+          textareaRef.value.setSelectionRange(atIdx, atIdx)
+        }
+      })
+    }
+  }
+}
+
 const bridgeCommands = computed(() => [
   { name: 'usage', args: '', description: t('chat.slashCommands.usage') },
   { name: 'status', args: '', description: t('chat.slashCommands.status') },
@@ -292,7 +350,7 @@ watch(() => chatStore.activeSession?.id, () => {
   loadDraftForActiveSession()
 })
 
-const canSend = computed(() => inputText.value.trim() || attachments.value.length > 0)
+const canSend = computed(() => inputText.value.trim() || attachments.value.length > 0 || fileRefs.value.length > 0)
 
 function scrollCommandIntoView() {
   nextTick(() => {
@@ -557,12 +615,23 @@ function handleDrop(e: DragEvent) {
 
 function handleSend() {
   const text = inputText.value.trim()
-  if (!text && attachments.value.length === 0) return
+  if (!text && attachments.value.length === 0 && fileRefs.value.length === 0) return
 
-  chatStore.sendMessage(text, attachments.value.length > 0 ? attachments.value : undefined)
+  // Build message with file references
+  let finalText = text
+  if (fileRefs.value.length > 0) {
+    const refBlock = fileRefs.value.map(r => {
+      const prefix = r.isDir ? '📁' : '📄'
+      return `[ref:${r.path}]`
+    }).join('\n')
+    finalText = refBlock + (text ? '\n' + text : '')
+  }
+
+  chatStore.sendMessage(finalText, attachments.value.length > 0 ? attachments.value : undefined)
   inputText.value = ''
   saveDraftForActiveSession('')
   attachments.value = []
+  fileRefs.value = []
   slashActive.value = false
 
   if (textareaRef.value) {
@@ -707,7 +776,10 @@ function handleKeydown(e: KeyboardEvent) {
 
 function handleInput(e: Event) {
   const el = e.target as HTMLTextAreaElement
-  if (!isComposing.value) updateSlashState()
+  if (!isComposing.value) {
+    updateSlashState()
+    detectAtTrigger()
+  }
   // 用户手动拖拽自定义高度时，不覆盖
   if (textareaHeight.value !== null) return
   el.style.height = 'auto'
@@ -796,6 +868,16 @@ function isImage(type: string): boolean {
           {{ t('chat.reasoningEffort.tooltip') }}: {{ reasoningEffortLabel }}
         </NTooltip>
       </NPopselect>
+      <NTooltip trigger="hover">
+        <template #trigger>
+          <NButton quaternary size="tiny" @click="showFileBrowser = true" circle>
+            <template #icon>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </template>
+          </NButton>
+        </template>
+        {{ t('fileBrowser.referenceTooltip') }}
+      </NTooltip>
 
       <div class="auto-play-speech-switch">
         <NTooltip trigger="hover">
@@ -885,6 +967,19 @@ function isImage(type: string): boolean {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
+    </div>
+
+    <!-- File reference chips -->
+    <div v-if="fileRefs.length > 0" class="file-ref-chips">
+      <div v-for="ref in fileRefs" :key="ref.path" class="file-ref-chip">
+        <span class="file-ref-icon">{{ ref.isDir ? '📁' : '📄' }}</span>
+        <span class="file-ref-name" :title="ref.path">{{ ref.name }}</span>
+        <span class="file-ref-path" :title="ref.path">{{ ref.path }}</span>
+        <button class="file-ref-remove" @click="removeFileRef(ref.path)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <button class="file-ref-clear" @click="clearFileRefs">{{ t('fileBrowser.clearAll') }}</button>
     </div>
 
     <div
@@ -1009,6 +1104,13 @@ function isImage(type: string): boolean {
         </div>
       </template>
     </NModal>
+
+    <!-- File Browser Modal -->
+    <FileBrowserModal
+      v-model:show="showFileBrowser"
+      :multi-select="true"
+      @select="handleFileBrowserSelect"
+    />
   </div>
 </template>
 
@@ -1385,5 +1487,84 @@ function isImage(type: string): boolean {
   border-color: var(--accent-info);
   border-style: dashed;
   background-color: rgba(var(--accent-info-rgb), 0.04);
+}
+
+// File reference chips
+.file-ref-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.file-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(26, 156, 110, 0.08);
+  border: 1px solid rgba(26, 156, 110, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  max-width: 300px;
+}
+
+.file-ref-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.file-ref-name {
+  font-weight: 500;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-ref-path {
+  color: #999;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.file-ref-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #999;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.15s;
+
+  &:hover {
+    background: rgba(232, 115, 74, 0.15);
+    color: #e8734a;
+  }
+}
+
+.file-ref-clear {
+  border: none;
+  background: transparent;
+  color: #999;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+
+  &:hover {
+    color: #e8734a;
+    background: rgba(232, 115, 74, 0.08);
+  }
 }
 </style>

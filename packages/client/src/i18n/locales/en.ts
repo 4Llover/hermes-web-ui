@@ -623,6 +623,19 @@ export default {
     speechNotSupported: 'Voice playback not supported in this browser',
   },
 
+  // File Browser
+  fileBrowser: {
+    title: 'Reference Files',
+    search: 'Search file name...',
+    empty: 'Directory is empty',
+    selected: '{count} item(s) selected',
+    hint: 'Click to select, double-click to confirm',
+    confirm: 'Confirm',
+    referenceFiles: 'Reference server files',
+    referenceTooltip: 'Reference server files / directories',
+    clearAll: 'Clear all references',
+  },
+
   // Kanban
   kanban: {
     title: 'Kanban Board',
