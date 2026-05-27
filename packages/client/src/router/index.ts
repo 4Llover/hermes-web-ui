@@ -26,6 +26,11 @@ const router = createRouter({
       component: () => import('@/views/hermes/HistoryView.vue'),
     },
     {
+      path: '/hermes/favorites',
+      name: 'hermes.favorites',
+      component: () => import('@/views/hermes/FavoritesView.vue'),
+    },
+    {
       path: '/hermes/history/session/:sessionId',
       name: 'hermes.historySession',
       component: () => import('@/views/hermes/HistoryView.vue'),

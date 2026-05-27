@@ -10,6 +10,7 @@ import { parseThinking, countThinkingChars } from "@/utils/thinking-parser";
 import { useChatStore } from "@/stores/hermes/chat";
 import { useProfilesStore } from "@/stores/hermes/profiles";
 import { useSettingsStore } from "@/stores/hermes/settings";
+import { useFavoritesStore } from "@/stores/hermes/favorites";
 import ProfileAvatar from "@/components/hermes/profiles/ProfileAvatar.vue";
 import {
   copyTextToClipboard,
@@ -183,6 +184,7 @@ const previewUrl = ref<string | null>(null);
 const chatStore = useChatStore();
 const profilesStore = useProfilesStore();
 const settingsStore = useSettingsStore();
+const favoritesStore = useFavoritesStore();
 const speech = useGlobalSpeech();
 const voiceSettings = useVoiceSettings();
 const assistantProfileName = computed(() => chatStore.activeSession?.profile || profilesStore.activeProfileName || "default");
@@ -205,6 +207,26 @@ async function copyBubbleContent() {
     return
   }
   toast.error(t('chat.copyFailed'))
+}
+
+// Favorite (star) toggle
+const isFavorited = computed(() => favoritesStore.isFavorited(String(props.message.id)))
+const canFavorite = computed(() => props.message.role === 'assistant' && !!props.message.content && !props.message.isStreaming)
+
+async function toggleFavorite() {
+  if (!chatStore.activeSession) return
+  try {
+    const result = await favoritesStore.toggleFavorite({
+      message_id: String(props.message.id),
+      session_id: chatStore.activeSession.id,
+      content: props.message.content || '',
+      role: props.message.role,
+      source_session_title: chatStore.activeSession.title || null,
+    })
+    toast.success(result ? t('chat.favorited') : t('chat.unfavorited'))
+  } catch {
+    toast.error(t('chat.favoriteFailed'))
+  }
 }
 
 const parsedThinking = computed(() =>
@@ -1019,6 +1041,20 @@ onBeforeUnmount(() => {
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
             </button>
+            <button
+              v-if="canFavorite"
+              class="favorite-btn"
+              :class="{ 'is-favorited': isFavorited }"
+              @click="toggleFavorite"
+              :title="isFavorited ? t('chat.unfavorite') : t('chat.favorite')"
+            >
+              <svg v-if="!isFavorited" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </button>
             <span class="message-time">{{ timeStr }}</span>
           </div>
         </div>
@@ -1433,7 +1469,8 @@ onBeforeUnmount(() => {
 }
 
 .copy-bubble-btn,
-.speech-bubble-btn {
+.speech-bubble-btn,
+.favorite-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1471,6 +1508,12 @@ onBeforeUnmount(() => {
       animation: none;
       opacity: 0.6;
     }
+  }
+}
+
+.favorite-btn {
+  &.is-favorited {
+    color: #f0b429;
   }
 }
 

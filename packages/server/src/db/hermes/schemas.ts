@@ -379,6 +379,28 @@ export const SESSION_RELATIONS_TO_INDEX = 'CREATE INDEX IF NOT EXISTS idx_sessio
 export const SESSION_RELATIONS_UNIQUE_INDEX = 'CREATE UNIQUE INDEX IF NOT EXISTS idx_session_relations_unique ON session_relations(from_session_id, to_session_id)'
 
 // ============================================================================
+// Favorites (收藏夹 - message bookmarks)
+// ============================================================================
+
+export const FAVORITES_TABLE = 'favorites'
+
+export const FAVORITES_SCHEMA: Record<string, string> = {
+  id: 'TEXT PRIMARY KEY',
+  message_id: 'TEXT NOT NULL',
+  session_id: 'TEXT NOT NULL',
+  content: 'TEXT NOT NULL DEFAULT \'\'',
+  role: "TEXT NOT NULL DEFAULT 'assistant'",
+  title: 'TEXT',
+  note: 'TEXT',
+  tags: 'TEXT',
+  source_session_title: 'TEXT',
+  created_at: 'INTEGER NOT NULL',
+}
+
+export const FAVORITES_SESSION_INDEX = 'CREATE INDEX IF NOT EXISTS idx_favorites_session ON favorites(session_id)'
+export const FAVORITES_CREATED_INDEX = 'CREATE INDEX IF NOT EXISTS idx_favorites_created ON favorites(created_at DESC)'
+
+// ============================================================================
 // Schema Sync Utilities
 // ============================================================================
 
@@ -565,6 +587,14 @@ export function initAllHermesTables(): void {
         idx_session_relations_from: SESSION_RELATIONS_FROM_INDEX,
         idx_session_relations_to: SESSION_RELATIONS_TO_INDEX,
         idx_session_relations_unique: SESSION_RELATIONS_UNIQUE_INDEX,
+      }
+    })
+
+    // Favorites (收藏夹)
+    syncTable(FAVORITES_TABLE, FAVORITES_SCHEMA, {
+      indexes: {
+        idx_favorites_session: FAVORITES_SESSION_INDEX,
+        idx_favorites_created: FAVORITES_CREATED_INDEX,
       }
     })
 

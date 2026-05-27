@@ -15,6 +15,7 @@ import { codexProxyRoutes } from './codex-proxy'
 import { sessionRoutes } from './hermes/sessions'
 import { folderRoutes } from './hermes/folders'
 import { tagRoutes } from './hermes/tags'
+import { favoriteRoutes } from './hermes/favorites'
 import { sessionRelationRoutes } from './hermes/session-relations'
 import { profileRoutes } from './hermes/profiles'
 import { skillRoutes } from './hermes/skills'
@@ -73,6 +74,7 @@ export function registerRoutes(app: any, authMiddleware: Array<(ctx: Context, ne
   app.use(sessionRoutes.routes())
   app.use(folderRoutes.routes())
   app.use(tagRoutes.routes())
+  app.use(favoriteRoutes.routes())
   app.use(sessionRelationRoutes.routes())
   app.use(profileRoutes.routes())
   app.use(skillRoutes.routes())

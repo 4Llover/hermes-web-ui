@@ -21,12 +21,14 @@ import { NButton, NInput } from "naive-ui";
 import VirtualMessageList from "./VirtualMessageList.vue";
 import MessageItem from "./MessageItem.vue";
 import { LIVE_CHAT_MAX_LOADED_MESSAGES, useChatStore } from "@/stores/hermes/chat";
+import { useFavoritesStore } from "@/stores/hermes/favorites";
 import thinkingImageLight from "@/assets/thinking-light.gif";
 import thinkingImageDark from "@/assets/thinking-dark.gif";
 import { useTheme } from "@/composables/useTheme";
 import { useToolTraceVisibility } from "@/composables/useToolTraceVisibility";
 
 const chatStore = useChatStore();
+const favoritesStore = useFavoritesStore();
 const { t } = useI18n();
 const { isDark } = useTheme();
 const { toolTraceVisible } = useToolTraceVisibility();
@@ -110,6 +112,20 @@ const displayMessages = computed(() => {
     return true;
   });
 });
+
+// Batch-check favorite status when messages change
+let favCheckTimer: ReturnType<typeof setTimeout> | null = null;
+watch(displayMessages, (msgs) => {
+  if (favCheckTimer) clearTimeout(favCheckTimer);
+  favCheckTimer = setTimeout(() => {
+    const assistantIds = msgs
+      .filter(m => m.role === 'assistant' && m.content)
+      .map(m => String(m.id));
+    if (assistantIds.length > 0) {
+      favoritesStore.checkMessages(assistantIds);
+    }
+  }, 300);
+}, { immediate: true });
 
 const queuedMessages = computed(() => {
   const sid = chatStore.activeSessionId;
