@@ -118,18 +118,73 @@ export function isSensitivePath(relativePath: string): boolean {
 }
 
 /**
- * Resolve a relative path to an absolute path under the hermes home directory.
- * Validates path safety (no traversal).
+ * Convert Windows-style paths to WSL paths.
+ * E.g., "C:\Users\foo" → "/mnt/c/Users/foo", "E:\Hermes Folder" → "/mnt/e/Hermes Folder"
+ */
+function windowsToWslPath(filePath: string): string {
+  // Match Windows drive letter paths: C:\, D:\, etc.
+  const winPathMatch = filePath.match(/^([a-zA-Z]):\\(.*)$/)
+  if (winPathMatch) {
+    const drive = winPathMatch[1].toLowerCase()
+    const rest = winPathMatch[2].replace(/\\/g, '/')
+    return `/mnt/${drive}/${rest}`
+  }
+  // Match forward-slash Windows paths: /C:/Users/...
+  const msysPathMatch = filePath.match(/^\/([a-zA-Z]):\/(.*)$/)
+  if (msysPathMatch) {
+    const drive = msysPathMatch[1].toLowerCase()
+    const rest = msysPathMatch[2]
+    return `/mnt/${drive}/${rest}`
+  }
+  return filePath
+}
+
+// Blocked system directories (security)
+const BLOCKED_PATHS = [
+  '/etc', '/proc', '/sys', '/dev', '/boot', '/sbin', '/bin',
+  '/usr/bin', '/usr/sbin', '/usr/lib', '/usr/lib64',
+  '/var/run', '/var/lock', '/tmp/.X11-unix',
+]
+
+function isBlockedPath(absPath: string): boolean {
+  const normalized = absPath.replace(/\\/g, '/')
+  return BLOCKED_PATHS.some(blocked =>
+    normalized === blocked || normalized.startsWith(blocked + '/')
+  )
+}
+
+/**
+ * Resolve a path to an absolute path.
+ * - Relative paths are resolved under the hermes home directory.
+ * - Absolute paths (Linux or Windows) are allowed with security checks.
+ * - Windows paths (C:\..., E:\...) are converted to WSL paths (/mnt/c/..., /mnt/e/...).
  */
 export function resolveHermesPath(relativePath: string, profile?: string): string {
   const homeDir = homeDirForProfile(profile)
-  if (!relativePath || relativePath === '.' || relativePath === '/') {
+  if (!relativePath || relativePath === '.') {
     return homeDir
   }
-  const normalized = normalize(relativePath).replace(/\\/g, '/')
-  if (normalized.startsWith('..') || normalized.includes('/../') || normalized.startsWith('/')) {
-    throw Object.assign(new Error('Invalid file path'), { code: 'invalid_path' })
+
+  // Convert Windows paths to WSL paths
+  const converted = windowsToWslPath(relativePath)
+  const normalized = normalize(converted).replace(/\\/g, '/')
+
+  // Check for traversal attacks
+  if (normalized.includes('/../')) {
+    throw Object.assign(new Error('Invalid file path: traversal detected'), { code: 'invalid_path' })
   }
+
+  // Absolute path handling (including root '/')
+  if (normalized.startsWith('/')) {
+    // Security: block access to sensitive system directories
+    if (isBlockedPath(normalized)) {
+      throw Object.assign(new Error('Access to system directory is not allowed'), { code: 'permission_denied' })
+    }
+    // Allow absolute paths (user wants to browse their filesystem)
+    return normalized
+  }
+
+  // Relative path: resolve under home directory
   const resolved = resolve(homeDir, normalized)
   if (!isPathWithin(resolved, homeDir)) {
     throw Object.assign(new Error('Path traversal detected'), { code: 'invalid_path' })
@@ -171,10 +226,12 @@ export class LocalFileProvider implements FileProvider {
       try {
         const fullPath = resolve(p, entry.name)
         const s = await fsStat(fullPath)
-        const relPath = relativePathFromBase(fullPath, this.homeDir) ?? entry.name
+        // Use absolute path when entry is outside homeDir (so frontend can navigate correctly)
+        const relPath = relativePathFromBase(fullPath, this.homeDir)
+        const entryPath = relPath ?? fullPath
         results.push({
           name: entry.name,
-          path: relPath,
+          path: entryPath,
           isDir: s.isDirectory(),
           size: s.size,
           modTime: s.mtime.toISOString(),
@@ -189,10 +246,11 @@ export class LocalFileProvider implements FileProvider {
   async stat(filePath: string): Promise<FileStat> {
     const p = validatePath(filePath)
     const s = await fsStat(p)
-    const relPath = relativePathFromBase(p, this.homeDir) ?? basename(p)
+    const relPath = relativePathFromBase(p, this.homeDir)
+    const entryPath = relPath ?? p
     return {
       name: basename(p),
-      path: relPath || basename(p),
+      path: entryPath || basename(p),
       isDir: s.isDirectory(),
       size: s.size,
       modTime: s.mtime.toISOString(),

@@ -634,6 +634,18 @@ export default {
     referenceFiles: '引用服务器文件',
     referenceTooltip: '引用服务器文件/目录',
     clearAll: '清除全部引用',
+    pathPlaceholder: '输入路径后回车跳转（支持 Windows 路径如 E:\\Hermes Folder）',
+    quickNav: {
+      label: '快速导航',
+      home: 'WSL 主目录',
+      desktop: 'Windows 桌面',
+      documents: 'Windows 文档',
+      downloads: 'Windows 下载',
+      hermesFolder: 'Hermes 工作目录',
+      mntC: 'C 盘',
+      mntD: 'D 盘',
+      mntE: 'E 盘',
+    },
   },
 
   // 看板

@@ -28,6 +28,21 @@ const error = ref<string | null>(null)
 const searchQuery = ref('')
 const searchInputRef = ref<InstanceType<typeof NInput>>()
 const selectedPaths = ref<Set<string>>(new Set())
+const pathInputValue = ref('')
+const isEditingPath = ref(false)
+const pathInputRef = ref<InstanceType<typeof NInput>>()
+
+// Quick navigation paths
+const quickNavPaths = computed(() => [
+  { label: t('fileBrowser.quickNav.home'), path: '/', icon: '🏠' },
+  { label: t('fileBrowser.quickNav.desktop'), path: '/mnt/c/Users', icon: '🖥️' },
+  { label: t('fileBrowser.quickNav.documents'), path: '/mnt/c/Users', icon: '📁' },
+  { label: t('fileBrowser.quickNav.downloads'), path: '/mnt/c/Users', icon: '⬇️' },
+  { label: t('fileBrowser.quickNav.hermesFolder'), path: '/mnt/e/Hermes Folder', icon: '⚡' },
+  { label: t('fileBrowser.quickNav.mntC'), path: '/mnt/c', icon: '💿' },
+  { label: t('fileBrowser.quickNav.mntD'), path: '/mnt/d', icon: '💿' },
+  { label: t('fileBrowser.quickNav.mntE'), path: '/mnt/e', icon: '💿' },
+])
 
 const breadcrumbs = computed(() => {
   const parts = currentPath.value.split('/').filter(Boolean)
@@ -71,20 +86,26 @@ async function navigateTo(path: string) {
 }
 
 function handleEntryClick(entry: FileEntry) {
-  if (entry.isDir) {
-    searchQuery.value = ''
-    navigateTo(entry.absolutePath || entry.path)
-  } else {
-    toggleSelect(entry)
-  }
+  toggleSelect(entry)
 }
 
 function handleEntryDblClick(entry: FileEntry) {
-  if (!entry.isDir) {
+  if (entry.isDir) {
+    // Double-click folder → navigate into it
+    searchQuery.value = ''
+    navigateTo(entry.absolutePath || entry.path)
+  } else {
+    // Double-click file → select + confirm
     selectedPaths.value.clear()
     selectedPaths.value.add(entry.absolutePath || entry.path)
     handleConfirm()
   }
+}
+
+function handleFolderEnter(entry: FileEntry, e: MouseEvent) {
+  e.stopPropagation()
+  searchQuery.value = ''
+  navigateTo(entry.absolutePath || entry.path)
 }
 
 function toggleSelect(entry: FileEntry) {
@@ -118,6 +139,35 @@ function handleConfirm() {
 function handleBreadcrumbClick(path: string) {
   searchQuery.value = ''
   navigateTo(path)
+}
+
+function startPathEdit() {
+  isEditingPath.value = true
+  pathInputValue.value = currentPath.value
+  nextTick(() => pathInputRef.value?.focus())
+}
+
+function handlePathInputConfirm() {
+  isEditingPath.value = false
+  const path = pathInputValue.value.trim()
+  if (path) {
+    // Convert Windows paths if needed
+    let convertedPath = path
+    const winMatch = path.match(/^([a-zA-Z]):\\(.*)$/)
+    if (winMatch) {
+      convertedPath = `/mnt/${winMatch[1].toLowerCase()}/${winMatch[2].replace(/\\/g, '/')}`
+    }
+    searchQuery.value = ''
+    navigateTo(convertedPath)
+  }
+}
+
+function handlePathInputKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    handlePathInputConfirm()
+  } else if (e.key === 'Escape') {
+    isEditingPath.value = false
+  }
 }
 
 function formatSize(bytes: number): string {
@@ -164,7 +214,7 @@ watch(() => props.show, (v) => {
     :bordered="false"
     :segmented="{ content: true, footer: true }"
   >
-    <div class="fb-breadcrumb">
+    <div class="fb-breadcrumb" @dblclick="startPathEdit">
       <span
         v-for="(crumb, i) in breadcrumbs"
         :key="crumb.path"
@@ -175,6 +225,40 @@ watch(() => props.show, (v) => {
         {{ crumb.label }}
         <span v-if="i < breadcrumbs.length - 1" class="fb-crumb-sep">/</span>
       </span>
+    </div>
+
+    <!-- Path input (shown on double-click breadcrumb or click edit icon) -->
+    <div v-if="isEditingPath" class="fb-path-input">
+      <NInput
+        ref="pathInputRef"
+        v-model:value="pathInputValue"
+        :placeholder="t('fileBrowser.pathPlaceholder')"
+        size="small"
+        @keydown="handlePathInputKeydown"
+        @blur="handlePathInputConfirm"
+      >
+        <template #prefix>
+          <span style="font-size: 12px; color: #999;">📂</span>
+        </template>
+        <template #suffix>
+          <NButton text size="tiny" @click="handlePathInputConfirm">{{ t('common.confirm') }}</NButton>
+        </template>
+      </NInput>
+    </div>
+
+    <!-- Quick navigation buttons -->
+    <div class="fb-quick-nav">
+      <span class="fb-quick-nav-label">{{ t('fileBrowser.quickNav.label') }}:</span>
+      <NButton
+        v-for="nav in quickNavPaths"
+        :key="nav.path"
+        text
+        size="tiny"
+        class="fb-quick-nav-btn"
+        @click="navigateTo(nav.path)"
+      >
+        {{ nav.icon }} {{ nav.label }}
+      </NButton>
     </div>
 
     <div class="fb-search">
@@ -210,6 +294,7 @@ watch(() => props.show, (v) => {
           >
             <span class="fb-entry-icon">{{ getFileIcon(entry) }}</span>
             <span class="fb-entry-name">{{ entry.name }}</span>
+            <span v-if="entry.isDir" class="fb-entry-enter" @click.stop="handleFolderEnter(entry, $event)" title="进入文件夹">▶</span>
             <span v-if="!entry.isDir" class="fb-entry-size">{{ formatSize(entry.size) }}</span>
             <span v-if="isSelected(entry)" class="fb-entry-check">✓</span>
           </div>
@@ -263,6 +348,36 @@ watch(() => props.show, (v) => {
 .fb-crumb-sep {
   color: #ccc;
   margin: 0 2px;
+}
+
+.fb-path-input {
+  margin-bottom: 8px;
+}
+
+.fb-quick-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  background: #f0f7f4;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.fb-quick-nav-label {
+  color: #666;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.fb-quick-nav-btn {
+  font-size: 11px;
+  color: #1a9c6e;
+  &:hover {
+    background: rgba(26, 156, 110, 0.1);
+  }
 }
 
 .fb-search { margin-bottom: 8px; }
@@ -326,6 +441,20 @@ watch(() => props.show, (v) => {
   font-weight: 600;
   font-size: 14px;
   flex-shrink: 0;
+}
+
+.fb-entry-enter {
+  color: #1a9c6e;
+  font-size: 10px;
+  flex-shrink: 0;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  &:hover { background: rgba(26, 156, 110, 0.15); }
+  .fb-entry:hover & { opacity: 0.6; }
+  .fb-entry:hover &:hover { opacity: 1; }
 }
 
 .fb-footer {

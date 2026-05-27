@@ -621,7 +621,6 @@ function handleSend() {
   let finalText = text
   if (fileRefs.value.length > 0) {
     const refBlock = fileRefs.value.map(r => {
-      const prefix = r.isDir ? '📁' : '📄'
       return `[ref:${r.path}]`
     }).join('\n')
     finalText = refBlock + (text ? '\n' + text : '')

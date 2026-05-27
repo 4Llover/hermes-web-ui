@@ -634,6 +634,18 @@ export default {
     referenceFiles: 'Reference server files',
     referenceTooltip: 'Reference server files / directories',
     clearAll: 'Clear all references',
+    pathPlaceholder: 'Enter path and press Enter to navigate (supports Windows paths like E:\\Hermes Folder)',
+    quickNav: {
+      label: 'Quick Nav',
+      home: 'WSL Home',
+      desktop: 'Windows Desktop',
+      documents: 'Windows Documents',
+      downloads: 'Windows Downloads',
+      hermesFolder: 'Hermes Folder',
+      mntC: 'C Drive',
+      mntD: 'D Drive',
+      mntE: 'E Drive',
+    },
   },
 
   // Kanban
