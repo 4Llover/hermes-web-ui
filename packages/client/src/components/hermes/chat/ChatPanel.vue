@@ -262,7 +262,7 @@ onMounted(async () => {
 
 interface FolderGroup {
   folder: Folder | null; // null = unfiled
-  sessions: ReturnType<typeof sortSessionsWithActiveFirst>;
+  sessions: Session[];
 }
 
 const folderGroups = computed<FolderGroup[]>(() => {
@@ -2015,119 +2015,6 @@ async function handleSessionModelCustomSubmit() {
             </div>
           </aside>
           <SessionRelationsPanel v-if="showRelations && chatStore.activeSessionId" :session-id="chatStore.activeSessionId" />
-        </div>
-        <div v-if="visibleApproval" class="approval-bar">
-          <div class="approval-icon" aria-hidden="true">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-              <path d="m9 12 2 2 4-4" />
-            </svg>
-          </div>
-          <div class="approval-content">
-            <div class="approval-main">
-              <div class="approval-kicker">{{ t("chat.approvalKicker") }}</div>
-              <div class="approval-title">{{ t("chat.approvalTitle") }}</div>
-              <div class="approval-desc">{{ visibleApproval.description }}</div>
-              <code class="approval-command">{{ visibleApproval.command }}</code>
-            </div>
-            <div class="approval-actions">
-              <NButton
-                v-if="visibleApproval.choices.includes('once')"
-                size="small"
-                type="primary"
-                @click="handleApproval('once')"
-              >
-                {{ t("chat.approvalAllowOnce") }}
-              </NButton>
-              <NButton
-                v-if="visibleApproval.choices.includes('session')"
-                size="small"
-                secondary
-                @click="handleApproval('session')"
-              >
-                {{ t("chat.approvalAllowSession") }}
-              </NButton>
-              <NButton
-                v-if="visibleApproval.choices.includes('always')"
-                size="small"
-                secondary
-                @click="handleApproval('always')"
-              >
-                {{ t("chat.approvalAlways") }}
-              </NButton>
-              <NButton
-                v-if="visibleApproval.choices.includes('deny')"
-                size="small"
-                type="error"
-                secondary
-                @click="handleApproval('deny')"
-              >
-                {{ t("chat.approvalDeny") }}
-              </NButton>
-            </div>
-          </div>
-        </div>
-        <div v-if="visibleClarify" class="clarify-bar">
-          <div class="clarify-icon" aria-hidden="true">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </div>
-          <div class="clarify-content">
-            <div class="clarify-main">
-              <div class="clarify-kicker">{{ t('chat.clarifyKicker') }}</div>
-              <div class="clarify-title">{{ t('chat.clarifyTitle') }}</div>
-              <div class="clarify-desc">{{ visibleClarify.question }}</div>
-            </div>
-            <div v-if="visibleClarify.choices && visibleClarify.choices.length" class="clarify-actions">
-              <NButton
-                v-for="choice in visibleClarify.choices"
-                :key="choice"
-                size="small"
-                type="primary"
-                @click="handleClarify(choice)"
-              >
-                {{ choice }}
-              </NButton>
-              <NButton
-                size="small"
-                type="error"
-                secondary
-                @click="handleClarify('')"
-              >
-                {{ t('chat.clarifyDismiss') }}
-              </NButton>
-            </div>
-            <div v-else class="clarify-actions clarify-actions-open">
-              <div class="clarify-input-row">
-                <NInput
-                  v-model:value="clarifyResponse"
-                  size="small"
-                  :placeholder="t('chat.clarifyPlaceholder')"
-                />
-              </div>
-            </div>
-          </aside>
         </div>
       </template>
       <ConversationMonitorPane

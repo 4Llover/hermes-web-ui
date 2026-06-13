@@ -22,7 +22,16 @@ function hasRoute(name: string): boolean {
 }
 const { record: collapsedGroups, persist: persistCollapsedGroups } = usePersistentRecord('hermes.sidebar.collapsedGroups');
 
-type SidebarGroupKey = "Agent" | "Monitoring" | "Tools" | "System";
+type SidebarGroupKey = "Conversation" | "Agent" | "Monitoring" | "Tools" | "System";
+
+function isNavActive(...names: string[]): boolean {
+  const key = route.name as string;
+  return names.includes(key);
+}
+
+function openSessionSearch() {
+  // Open session search dialog
+}
 
 function groupLabel(key: SidebarGroupKey) {
   return t(`sidebar.group${key}${appStore.sidebarCollapsed ? "Short" : ""}`);
